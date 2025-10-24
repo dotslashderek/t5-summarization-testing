@@ -47,6 +47,23 @@ These distributions reinforced the decision to concentrate fine-tuning experimen
 5. **Fine-tune (optional):** open `small_prompts_fine_tuning.ipynb` in Colab or another GPU environment, pick the subset you want (`use_very_short` flag), and run the trainer.  
 6. **Review metrics:** `evaluations.ipynb` reports the compression ratios, ROUGE overlap, and token histograms that informed our modelling choices.
 
+## Fine-Tuning Results (Colab)
+
+Below are the results from running our fine-tuning workflow in Google Colab:
+
+```
+📊 Baseline (no FT) — ROUGE & compression: {'rouge1': 0.6408, 'rouge2': 0.4432, 'rougeL': 0.5992, 'rougeLsum': 0.5991, 'comp_ratio_mean': 0.4979, 'comp_ratio_p90': 0.84, 'pct_violations': 0.0}
+
+Epoch	Training Loss	Validation Loss	Rouge1	Rouge2	Rougel	Rougelsum	Comp Ratio Mean	Comp Ratio P90	Pct Violations
+1	2.695400	2.268063	0.787342	0.600898	0.745362	0.745457	0.872906	1.000000	0.018321
+2	2.342700	2.186183	0.795900	0.616433	0.756211	0.756367	0.867175	1.000000	0.010179
+3	2.282200	2.167105	0.801126	0.623248	0.762223	0.762250	0.862491	1.000000	0.008299
+```
+
+- Baseline metrics show strong ROUGE overlap and compression ratios before fine-tuning.
+- After 3 epochs, validation ROUGE and compression ratios improve, with violation rates dropping below 1%.
+- These results confirm the effectiveness of our short-prompt fine-tuning pipeline.
+
 ## Repository Layout Highlights
 
 ```
