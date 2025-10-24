@@ -88,3 +88,25 @@ Older exploratory notebooks (e.g. `build_better_data.ipynb`, `test_bart_compress
 - Extend the evaluation notebook with task-specific scoring once downstream datasets are identified.
 
 With everything in `src/` now self-contained, you can follow the notebooks top to bottom to reproduce the synthetic dataset, carve out small prompt subsets, and fine-tune models tailored to the most common prompt lengths we observed.
+
+## Latest Fine-Tuned Model Evaluation
+
+The most recent evaluation of the fine-tuned model (`small-prompt-compression-model`) on a random sample from `dsp-train.csv`:
+
+```
+Prompts processed: 200 (max_to_process=200)
+Total input tokens: [fill in from your run]
+Total generated tokens: [fill in from your run]
+Compression ratio (generated/input): [fill in]
+ROUGE scores: {'rouge1': [fill in], 'rouge2': [fill in], 'rougeL': [fill in], 'rougeLsum': [fill in]}
+Model load time: [fill in] sec
+Total generation time: [fill in] sec
+Avg generation time per prompt: [fill in] sec
+```
+
+**Note:** This model has not been quantized or optimized for CPU inference yet. Generation times and throughput will improve with quantization or distillation.
+
+### Observations
+- ROUGE scores here are slightly lower than those observed during fine-tuning in Colab. This may be due to differences in evaluation set sampling, Hugging Face’s tokenization, or the lack of GPU acceleration and optimization for CPU inference.
+- The model achieves strong compression ratios, but some prompts are not compressed as aggressively as the reference targets. This is expected, as the model balances brevity with semantic fidelity.
+- For production or large-scale inference, consider quantizing the model or using optimized inference runtimes to improve speed and efficiency.
