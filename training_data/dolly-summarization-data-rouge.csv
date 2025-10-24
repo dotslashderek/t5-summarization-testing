@@ -1,4 +1,4 @@
-"original","compression","original_token_count","compression_token_count","compression_ratio","rouge_1","rouge_2","rouge_l"
+"original","compressed","original_token_count","compressed_token_count","compression_ratio","rouge_1","rouge_2","rouge_l"
 "When did Virgin Australia start operating?","When did Virgin Australia start operating?","7","7","1.0","1.0","1.0","1.0"
 "Which is a species of fish? Tope or Rope","Which is a species of fish? Tope or Rope","11","11","1.0","1.0","1.0","1.0"
 "Why can camels survive for long without water?","Why can camels survive long without water?","10","9","0.9","0.9333","0.7692","0.9333"
