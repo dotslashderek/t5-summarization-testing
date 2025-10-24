@@ -43,11 +43,11 @@ _client: OpenAI | None = None
 
 
 class CompressionResult(BaseModel):
-    compressed_prompt: str
+    compressed: str
 
 
 class VariantResult(BaseModel):
-    compressed_prompt: str
+    compressed: str
     uncompressed_alt_one: str
     uncompressed_alt_two: str
 
@@ -84,7 +84,7 @@ def ensure_base_prompts():
         return
     RAW_PROMPTS_CSV.parent.mkdir(parents=True, exist_ok=True)
     dataset = load_dataset('databricks/databricks-dolly-15k')
-    instructions = dataset['train']['instruction']
+    instructions = dataset['train']['instruction'] # type: ignore
     with RAW_PROMPTS_CSV.open('w', encoding='utf-8', newline='') as fh:
         writer = csv.writer(fh)
         writer.writerow(['original'])
@@ -134,9 +134,10 @@ def _call_model(system_prompt: str, result_model: Type[BaseModel], prompt_text: 
     last_error: Exception | None = None
     for attempt in range(1, MAX_RETRIES + 1):
         try:
+            # Convert messages to the expected input type (str)
             response = client.responses.parse(
                 model=MODEL_NAME,
-                input=messages,
+                input=str(messages),
                 reasoning={'effort': REASONING_EFFORT},
                 text={'verbosity': VERBOSITY},
                 max_output_tokens=MAX_OUTPUT_TOKENS,
@@ -183,8 +184,8 @@ def _write_rows(config: GenerationConfig, rows: Iterable[dict[str, str]]):
     rows = list(rows)
     for row in rows:
         row['original_token_count'] = str(_count_tokens(row['original']))
-        if 'compressed_prompt' in row:
-            compressed = row.get('compressed_prompt', '').strip()
+        if 'compressed' in row:
+            compressed = row.get('compressed', '').strip()
             if compressed:
                 comp_tokens = _count_tokens(compressed)
                 row['compressed_token_count'] = str(comp_tokens)
@@ -204,7 +205,7 @@ def _write_rows(config: GenerationConfig, rows: Iterable[dict[str, str]]):
 
 def run_generation(config: GenerationConfig):
     rows = _prepare_rows(config)
-    pending = [(idx, row) for idx, row in enumerate(rows) if not (row.get('compressed_prompt') or '').strip()]
+    pending = [(idx, row) for idx, row in enumerate(rows) if not (row.get('compressed') or '').strip()]
     if config.limit is not None:
         pending = pending[:config.limit]
     print(f'Total rows: {len(rows)} | Pending: {len(pending)}')
@@ -223,22 +224,22 @@ def run_generation(config: GenerationConfig):
                     parsed, raw = future.result()
                 except Exception as err:
                     raise RuntimeError(f'Row {idx + 1} failed after retries: {err}') from err
-                compressed = parsed.compressed_prompt.strip() if hasattr(parsed, 'compressed_prompt') else ''
-                if 'compressed_prompt' in rows[idx]:
+                compressed = getattr(parsed, 'compressed', '').strip()
+                if 'compressed' in rows[idx]:
                     fallback = rows[idx]['original'].strip()
                     if not compressed:
                         compressed = fallback
                     compressed = compressed.rstrip('?!…').rstrip('.')
-                    rows[idx]['compressed_prompt'] = compressed
+                    rows[idx]['compressed'] = compressed
                     rows[idx]['compressed_token_count'] = str(_count_tokens(compressed))
                 if 'compression_ratio' in rows[idx]:
                     comp_tokens = int(rows[idx]['compressed_token_count'])
                     orig_tokens = max(_count_tokens(rows[idx]['original']), 1)
                     rows[idx]['compression_ratio'] = f"{comp_tokens / orig_tokens:.4f}"
                 if hasattr(parsed, 'uncompressed_alt_one'):
-                    rows[idx]['uncompressed_alt_one'] = parsed.uncompressed_alt_one.strip()
+                    rows[idx]['uncompressed_alt_one'] = getattr(parsed, 'uncompressed_alt_one', '').strip()
                 if hasattr(parsed, 'uncompressed_alt_two'):
-                    rows[idx]['uncompressed_alt_two'] = parsed.uncompressed_alt_two.strip()
+                    rows[idx]['uncompressed_alt_two'] = getattr(parsed, 'uncompressed_alt_two', '').strip()
                 processed += 1
                 print(f"Row {idx + 1}: {raw[:120]}...")
             _write_rows(config, rows)
@@ -254,7 +255,7 @@ def summarize_dataset(path: Path, sample_size: int = 3):
     with path.open('r', encoding='utf-8', newline='') as fh:
         reader = list(csv.DictReader(fh))
     total = len(reader)
-    completed = sum(1 for row in reader if (row.get('compressed_prompt') or '').strip())
+    completed = sum(1 for row in reader if (row.get('compressed') or '').strip())
     ratios = [float(row['compression_ratio']) for row in reader if row.get('compression_ratio')]
     avg_ratio = sum(ratios) / len(ratios) if ratios else None
     print(f'Rows: {total} | Completed: {completed}')
@@ -262,14 +263,14 @@ def summarize_dataset(path: Path, sample_size: int = 3):
         print(f'Average compression ratio: {avg_ratio:.4f}')
     print('\nSample rows:')
     for row in reader[:sample_size]:
-        print({key: row.get(key, '') for key in ('original', 'compressed_prompt', 'compression_ratio', 'uncompressed_alt_one', 'uncompressed_alt_two')})
+        print({key: row.get(key, '') for key in ('original', 'compressed', 'compression_ratio', 'uncompressed_alt_one', 'uncompressed_alt_two')})
 
 
 def primary_config(limit: int | None = None) -> GenerationConfig:
     fieldnames = [
         'original',
         'original_token_count',
-        'compressed_prompt',
+        'compressed',
         'compressed_token_count',
         'compression_ratio',
         'uncompressed_alt_one',
@@ -278,7 +279,7 @@ def primary_config(limit: int | None = None) -> GenerationConfig:
     system_prompt = (
         "You are PromptCompressor. Rewrite prompts for downstream LLMs with the fewest possible tokens while preserving every constraint. "
         "Remove trailing punctuation unless it changes meaning, drop optional articles, helper verbs, and pleasantries, "
-        "and preserve modality, polarity, ordering, entities, dates, numbers, and units exactly. Return JSON only: {\"compressed_prompt\": \"...\"}."
+        "and preserve modality, polarity, ordering, entities, dates, numbers, and units exactly. Return JSON only: {\"compressed\": \"...\"}."
     )
     return GenerationConfig(
         output_path=PRIMARY_OUTPUT,
@@ -293,7 +294,7 @@ def variant_config(limit: int | None = None) -> GenerationConfig:
     fieldnames = [
         'original',
         'original_token_count',
-        'compressed_prompt',
+        'compressed',
         'compressed_token_count',
         'uncompressed_alt_one',
         'uncompressed_alt_two',
@@ -301,7 +302,7 @@ def variant_config(limit: int | None = None) -> GenerationConfig:
     system_prompt = (
         "You are PromptCompressor+. First create two stylistic variants of the original prompt that keep all facts and constraints. "
         "Then compress the shared intent into the shortest possible prompt, removing trailing punctuation where safe. "
-        "Return JSON only: {\"compressed_prompt\": ..., \"uncompressed_alt_one\": ..., \"uncompressed_alt_two\": ...}."
+        "Return JSON only: {\"compressed\": ..., \"uncompressed_alt_one\": ..., \"uncompressed_alt_two\": ...}."
     )
     return GenerationConfig(
         output_path=VARIANT_OUTPUT,
